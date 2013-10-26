@@ -1,4 +1,4 @@
-var	fs = require('fs'),
+var fs = require('fs'),
 	request = require('request'),
 	http = require('http'),
 	mysql = require('mysql'),
@@ -13,8 +13,7 @@ var manhua = {
 	url: 'http://book.2345.com/manhua/1021.html',
 	baseUrl: 'http://mhimg.ali213.net',
 	pageEnd: false,
-	init: function()
-	{
+	init: function() {
 		connection.connect(function(err) { // The server is either down
 			if (err) {
 				console.log('error when connecting to db:', err);
@@ -22,49 +21,44 @@ var manhua = {
 		});
 		this.run();
 	},
-	run: function()
-	{
+	run: function() {
 		var _this = this;
+		//那一部漫画
 		$.get(this.url, function(data) {
 			$(data).find('.cartoon_chapter li').each(function() {
 				var cUrl = $(this).find('a').attr('href');
 				pName = $(this).text();
-				// connection.query(
-				// 'INSERT INTO sets (sid, name, url) VALUES (1, "'+pName+'", "'+cUrl+'")',
-				// function(err, result) {
-				// 	console.log(result);
-				// });
-				if (!_this.pageEnd) {
-					_this.getCartoonUrl(cUrl, 0);
-				} else {
-					console.log('sadgadsg');
-				}
+				connection.query(
+					'INSERT INTO sets (sid, name, url) VALUES (1, "'+pName+'", "'+cUrl+'")',
+					function(err, result) {
+						console.log(result);
+					}
+				);
+				_this.getCartoonUrl(cUrl, 0);
 			});
 		});
 	},
-	getCartoonUrl: function(cUrl, num)
-	{
+	//what episode
+	getCartoonUrl: function(cUrl, num) {
 		var _this = this;
 		request(cUrl, function(error, response, page) {
-			var evals = page.match(/eval\((.*)\)\s+;\s+/);
-			var four = evals[1].match(/'(var.*)[|?]'\.split(.*)/);
-			var values = evals[1].match(/\}\('(.*)',(.*),(.*),(.*),(.*),(.*)\)/);
-			var hash = _this.matchPath(values[1], values[2], values[3], four[1], values[5]);
-			request(_this.baseUrl + hash + num + '.jpg', function(error, response, page) {
-				if (!error && response.statusCode !== 403 && response.statusCode !== 404) {
-					num = num + 5;
-					console.log(_this.baseUrl + hash + num + '.jpg');
-					_this.pageEnd = false;
-					_this.getCartoonUrl(cUrl, num + 1);
-				} else {
-					_this.pageEnd = true;
+			if (!error && response.statusCode == 200) {
+				var evals = page.match(/eval\((.*)\)\s+;\s+/);
+				//匹配var 第四个参数
+				var four = evals[1].match(/'([\|]?var.*[\|]?)'\.split/);
+				var values = evals[1].match(/\}\('(.*)',(.*),(.*),(.*),(.*),(.*)\)/);
+				var hash = _this.matchPath(values[1], values[2], values[3], four[1], values[5]);
+				//找每话漫画的页码
+				var pageNum = $(page).find('.totalpage').text();
+				for (var i = 1; i < pageNum*1; i++) {
+					console.log(_this.baseUrl + hash + i + '.jpg');
 				}
-			});
+			}
 		});
 		return true;
 	},
-	matchPath: function(one, two, three, four, five)
-	{
+	//这个是解析漫画图片算法
+	matchPath: function(one, two, three, four, five) {
 		one = one.replace(/\\/g, '');
 		eval(function(p, a, c, k, e, d) {
 			e = function(c) {
