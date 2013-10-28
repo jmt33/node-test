@@ -2,6 +2,7 @@ var fs = require('fs'),
 	request = require('request'),
 	http = require('http'),
 	mysql = require('mysql'),
+	iconv = require('iconv-lite'),
 	$ = require('jquery').create(),
 	connection = mysql.createConnection({
 		host: 'localhost',
@@ -26,32 +27,42 @@ var manhua = {
 		//那一部漫画
 		$.get(this.url, function(data) {
 			$(data).find('.cartoon_chapter li').each(function() {
+
 				var cUrl = $(this).find('a').attr('href');
-				pName = $(this).text();
+				//pName = iconv.encode($(this).text(), 'utf-8');
+				var pName = iconv.decode($(this).text(), 'GBK');
 				connection.query(
-					'INSERT INTO sets (sid, name, url) VALUES (1, "'+pName+'", "'+cUrl+'")',
+					'INSERT INTO sets (cid, name, url) VALUES (1, "'+pName+'", "'+cUrl+'")',
 					function(err, result) {
-						console.log(result);
+						_this.getCartoonUrl(cUrl, result.insertId);
 					}
 				);
-				_this.getCartoonUrl(cUrl, 0);
+				
 			});
 		});
 	},
 	//what episode
-	getCartoonUrl: function(cUrl, num) {
+	getCartoonUrl: function(cUrl, insertId) {
 		var _this = this;
 		request(cUrl, function(error, response, page) {
 			if (!error && response.statusCode == 200) {
 				var evals = page.match(/eval\((.*)\)\s+;\s+/);
 				//匹配var 第四个参数
 				var four = evals[1].match(/'([\|]?var.*[\|]?)'\.split/);
+				//处了第四个所有参数
 				var values = evals[1].match(/\}\('(.*)',(.*),(.*),(.*),(.*),(.*)\)/);
 				var hash = _this.matchPath(values[1], values[2], values[3], four[1], values[5]);
 				//找每话漫画的页码
 				var pageNum = $(page).find('.totalpage').text();
 				for (var i = 1; i < pageNum*1; i++) {
-					console.log(_this.baseUrl + hash + i + '.jpg');
+					//console.log(_this.baseUrl + hash + i + '.jpg');
+					var picUrl = _this.baseUrl + hash + i + '.jpg';
+					connection.query(
+						'INSERT INTO content (sid, picUrl) VALUES ('+insertId+', "'+picUrl+'")',
+						function(err, result) {
+							console.log(result);
+						}
+					);
 				}
 			}
 		});
